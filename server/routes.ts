@@ -156,6 +156,148 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Dynamic webhook endpoint for specific webhook IDs
+  app.post("/api/webhook/:webhookId", async (req, res) => {
+    const startTime = Date.now();
+    const webhookId = req.params.webhookId;
+    
+    try {
+      logger.info(`Received webhook request for ID: ${webhookId}`, { payload: req.body });
+      
+      // Get webhook configuration
+      const webhook = await storage.getWebhook(webhookId);
+      if (!webhook) {
+        return res.status(404).json({ 
+          success: false, 
+          error: 'Webhook not found' 
+        });
+      }
+      
+      if (!webhook.isActive) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Webhook is not active' 
+        });
+      }
+      
+      // Validate secret token if provided
+      if (webhook.secretToken && req.headers['x-secret-token'] !== webhook.secretToken) {
+        return res.status(401).json({ 
+          success: false, 
+          error: 'Invalid secret token' 
+        });
+      }
+      
+      // Validate task payload
+      const validatedPayload = webhookTaskPayloadSchema.parse(req.body);
+      
+      // Check if task exists (for updates)
+      let task;
+      if (validatedPayload.id || validatedPayload.externalId) {
+        const existingTasks = await storage.getAllTasks();
+        task = existingTasks.find(t => 
+          t.id === validatedPayload.id ||
+          (t.externalId === validatedPayload.externalId && 
+           t.sourceSystem === validatedPayload.sourceSystem)
+        );
+      }
+      
+      if (task) {
+        // Update existing task
+        const oldStatus = task.status;
+        task = await storage.updateTask(task.id, {
+          title: validatedPayload.title,
+          description: validatedPayload.description,
+          status: validatedPayload.status,
+          priority: validatedPayload.priority || 'medium',
+          projectName: validatedPayload.projectName,
+          assignee: validatedPayload.assignee,
+          metadata: validatedPayload.metadata,
+        });
+        
+        // Send notification if task was completed
+        if (oldStatus !== 'completed' && validatedPayload.status === 'completed' && task) {
+          await emailService.sendTaskCompletedNotification(task.id);
+        }
+        
+        logger.info(`Task updated: ${task?.id}`);
+      } else {
+        // Create new task
+        task = await storage.createTask({
+          title: validatedPayload.title,
+          description: validatedPayload.description,
+          status: validatedPayload.status,
+          priority: validatedPayload.priority || 'medium',
+          projectName: validatedPayload.projectName,
+          assignee: validatedPayload.assignee,
+          sourceSystem: validatedPayload.sourceSystem || 'webhook',
+          externalId: validatedPayload.externalId || validatedPayload.id,
+          metadata: validatedPayload.metadata,
+        });
+        
+        // Send notification if task was created as completed
+        if (validatedPayload.status === 'completed') {
+          await emailService.sendTaskCompletedNotification(task.id);
+        }
+        
+        logger.info(`Task created: ${task.id}`);
+      }
+      
+      // Sync to external service asynchronously
+      if (task) {
+        syncService.syncTaskUpdate(task.id).catch(error => {
+          logger.error('Async sync failed:', error);
+        });
+      }
+      
+      const responseTime = Date.now() - startTime;
+      
+      // Log successful webhook processing
+      await storage.createWebhookLog({
+        webhookId,
+        method: req.method,
+        payload: req.body,
+        status: 'success',
+        responseTime,
+      });
+      
+      // Update webhook stats
+      await storage.updateWebhookStats(webhookId, true, responseTime);
+      
+      res.status(200).json({ 
+        success: true, 
+        taskId: task!.id,
+        action: task ? 'updated' : 'created'
+      });
+      
+    } catch (error) {
+      const responseTime = Date.now() - startTime;
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      logger.error('Dynamic webhook processing failed:', error);
+      
+      // Log failed webhook processing
+      await storage.createWebhookLog({
+        webhookId,
+        method: req.method,
+        payload: req.body,
+        status: 'error',
+        errorMessage,
+        responseTime,
+      });
+      
+      await storage.updateWebhookStats(webhookId, false, responseTime);
+      
+      // Send error alert
+      await emailService.sendErrorAlert(error, 'Dynamic Webhook Processing');
+      
+      res.status(400).json({ 
+        success: false, 
+        error: errorMessage 
+      });
+    }
+  });
+
   // Dashboard API endpoints
   app.get("/api/dashboard/stats", async (req, res) => {
     try {

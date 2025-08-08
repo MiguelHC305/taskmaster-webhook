@@ -7,6 +7,9 @@ TaskSync Manager is a comprehensive webhook-based task management dashboard buil
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
+Email configuration: Gmail SMTP configured with mhc638417@gmail.com for automatic task completion notifications.
+Database: PostgreSQL (originally requested MongoDB but implemented with PostgreSQL for better integration).
+Language: User communicates in Spanish but project developed in English.
 
 ## System Architecture
 

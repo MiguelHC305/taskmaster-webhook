@@ -14,12 +14,12 @@ class EmailService {
 
   constructor() {
     this.transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: process.env.SMTP_SECURE === 'true',
+      host: 'smtp.gmail.com',
+      port: 587,
+      secure: false,
       auth: {
-        user: process.env.SMTP_USER || process.env.EMAIL_USER || 'your-email@gmail.com',
-        pass: process.env.SMTP_PASS || process.env.EMAIL_PASS || 'your-app-password',
+        user: 'mhc638417@gmail.com',
+        pass: 'xtqm bzsa qhjt ltdt',
       },
     });
   }
@@ -27,7 +27,7 @@ class EmailService {
   async sendEmail(emailData: EmailData): Promise<boolean> {
     try {
       const info = await this.transporter.sendMail({
-        from: process.env.FROM_EMAIL || process.env.SMTP_USER || 'noreply@taskmaster.com',
+        from: '"TaskMaster" <mhc638417@gmail.com>',
         to: emailData.to,
         subject: emailData.subject,
         text: emailData.text,
@@ -160,3 +160,23 @@ class EmailService {
 }
 
 export const emailService = new EmailService();
+
+// Simple email function for easy usage
+export const sendEmail = async (to: string, subject: string, html: string) => {
+  const transporter = nodemailer.createTransport({
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false,
+    auth: {
+      user: 'mhc638417@gmail.com',
+      pass: 'xtqm bzsa qhjt ltdt',
+    },
+  });
+
+  await transporter.sendMail({
+    from: '"TaskMaster" <mhc638417@gmail.com>',
+    to,
+    subject,
+    html,
+  });
+};
