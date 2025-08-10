@@ -1,21 +1,23 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
-import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
+// import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal"; // Comenta temporalmente
 
-const isRepl = process.env.NODE_ENV !== "production" && process.env.REPL_ID !== undefined;
+function getPlugins() {
+  const plugins = [react()];
+  // const plugins = [react(), runtimeErrorOverlay()]; // Comenta temporalmente
 
-let plugins = [react(), runtimeErrorOverlay()];
-
-if (isRepl) {
-  // Importa sin top-level await usando .then
-  import("@replit/vite-plugin-cartographer").then((mod) => {
-    plugins.push(mod.cartographer());
-  });
+  if (process.env.NODE_ENV !== "production" && process.env.REPL_ID !== undefined) {
+    // Importa sin await, agrega después de la configuración (quizás no ideal, pero evita error)
+    import("@replit/vite-plugin-cartographer").then((m) => {
+      plugins.push(m.cartographer());
+    });
+  }
+  return plugins;
 }
 
 export default defineConfig({
-  plugins,
+  plugins: getPlugins(),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "client/src"),
@@ -35,5 +37,3 @@ export default defineConfig({
     },
   },
 });
-
-
