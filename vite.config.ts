@@ -4,13 +4,10 @@ import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 import cartographer from "@replit/vite-plugin-cartographer";
 
-const plugins = [
-  react(),
-  runtimeErrorOverlay(),
-];
+const plugins = [react(), runtimeErrorOverlay()];
 
-// Solo agrega el plugin cartographer si estás en desarrollo y en Replit
-if (process.env.NODE_ENV !== "production" && process.env.REPL_ID !== undefined) {
+// Agrega cartographer solo si no estás en producción y estás en Replit
+if (process.env.NODE_ENV !== "production" && process.env.REPL_ID) {
   plugins.push(cartographer());
 }
 
