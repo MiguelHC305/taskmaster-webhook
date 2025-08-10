@@ -1,11 +1,13 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { MessagingResponse } from 'twilio/lib/twiml/MessagingResponse'; // Añadido para Twilio
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// Middleware para logging
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -36,6 +38,20 @@ app.use((req, res, next) => {
   next();
 });
 
+// Endpoint para WhatsApp (Twilio)
+app.post('/whatsapp', (req: Request, res: Response) => {
+  const twiml = new MessagingResponse();
+  const msg = req.body.Body?.toLowerCase() || '';
+  if (msg === 'hola') {
+    twiml.message('¡Hola! Escribe "stock" para ver inventario.');
+  } else if (msg === 'stock') {
+    twiml.message('Stock actual: 100 unidades.');
+  } else {
+    twiml.message('No entendí. Usa "hola" o "stock".');
+  }
+  res.type('text/xml').send(twiml.toString());
+});
+
 (async () => {
   const server = await registerRoutes(app);
 
@@ -47,19 +63,14 @@ app.use((req, res, next) => {
     throw err;
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
+  // Configuración de Vite y static serving
   if (app.get("env") === "development") {
     await setupVite(app, server);
   } else {
     serveStatic(app);
   }
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
+  // Servidor en el puerto especificado
   const port = parseInt(process.env.PORT || '5000', 10);
   server.listen({
     port,
