@@ -1,26 +1,25 @@
 import express from 'express';
-import { MessagingResponse } from 'twilio/lib/twiml/MessagingResponse';
+import bodyParser from 'body-parser';
+import { MessagingResponse } from 'twilio';
 
 const app = express();
-app.use(express.urlencoded({ extended: false }));
-app.use(express.json());
+app.use(bodyParser.urlencoded({ extended: false }));
 
-app.post('/whatsapp', (req, res) => {
+app.post('/webhook', (req, res) => {
   const twiml = new MessagingResponse();
   const msg = req.body.Body?.toLowerCase() || '';
 
-  if (msg === 'hola') {
-    twiml.message('¡Hola! Escribe "stock" para ver inventario.');
-  } else if (msg === 'stock') {
-    twiml.message('Stock actual: 100 unidades.');
+  if (msg.includes('stock')) {
+    twiml.message('📦 Hay 25 unidades disponibles en el almacén.');
+  } else if (msg.includes('venta')) {
+    twiml.message('🧾 Venta registrada con éxito.');
   } else {
-    twiml.message('No entendí. Usa "hola" o "stock".');
+    twiml.message('🤖 Hola, soy TaskMaster. Puedes escribirme "stock", "venta" o "disponibilidad".');
   }
 
-  res.type('text/xml').send(twiml.toString());
+  res.writeHead(200, { 'Content-Type': 'text/xml' });
+  res.end(twiml.toString());
 });
 
-const port = parseInt(process.env.PORT || '5000', 10);
-app.listen(port, () => {
-  console.log(`Servidor corriendo en puerto ${port}`);
-});
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`✅ Servidor escuchando en el puerto ${PORT}`));
